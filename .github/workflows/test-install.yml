@@ -1,0 +1,90 @@
+name: Test Installation
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-install-dotnet:
+    name: Test .NET Stack Installation
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup test project
+        run: |
+          mkdir -p /tmp/test-project
+          cd /tmp/test-project
+          git init
+          git config user.name "Test User"
+          git config user.email "test@example.com"
+
+      - name: Test dry-run installation
+        run: |
+          cd /tmp/test-project
+          ${{ github.workspace }}/cli/install.sh --stack dotnet --dry-run
+
+      - name: Test actual installation
+        run: |
+          cd /tmp/test-project
+          ${{ github.workspace }}/cli/install.sh --stack dotnet
+
+      - name: Verify installation
+        run: |
+          cd /tmp/test-project
+          # Check that directories were created
+          test -d .agent/base || exit 1
+          test -d .agent/stacks/dotnet || exit 1
+          test -d .agent/adapters || exit 1
+          test -d .agent/local || exit 1
+
+          # Check that files were created
+          test -f .pre-commit-config.yaml || exit 1
+          test -f .agent/base/20-rules.md || exit 1
+          test -f .agent/local/README.md || exit 1
+
+          echo "✅ Installation verification passed"
+
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      - name: Test pre-commit hooks
+        run: |
+          cd /tmp/test-project
+          pre-commit install
+          # Run hooks (may fail on empty repo, that's ok)
+          pre-commit run --all-files || true
+          echo "✅ Pre-commit hooks tested"
+
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run shellcheck
+        run: shellcheck cli/install.sh
+
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint markdown
+        uses: articulate/actions-markdownlint@v1
+        with:
+          config: .markdownlint.json
+          files: '**/*.md'
+          ignore: templates/

@@ -1,0 +1,179 @@
+# Pre-commit configuration for winged-bean multi-language project
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+
+repos:
+  # Basic file hygiene and common checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+            projects/dotnet/.*\.(cs|vb|fs)|  # Let dotnet format handle .NET files
+            development/dotnet/.*\.(cs|vb|fs)|  # Let dotnet format handle .NET files
+            infra/terraform/.*\.(tf|tfvars)|  # Let terraform fmt handle terraform files
+            .*\.md  # Exclude markdown files (trailing spaces are intentional for line breaks)
+          )$
+      - id: end-of-file-fixer
+        exclude: ^infra/terraform/.*\.(tf|tfvars)$  # Let terraform fmt handle terraform files
+      - id: check-json
+        exclude: ^infra/terraform/.*\.(tf|tfvars)$  # Terraform files are not JSON
+      - id: check-xml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # Secret detection (GitLeaks is faster, detect-secrets is more comprehensive)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+        exclude: ^infra/terraform/.*  # Terraform files are managed by terraform tooling
+
+  # Comprehensive secret detection with baseline filtering
+  # - repo: https://github.com/Yelp/detect-secrets
+  #   rev: v1.5.0
+  #   hooks:
+  #     - id: detect-secrets
+  #       args: ['--baseline', '.secrets.baseline']
+  #       exclude: .*\.lock$|.*pnpm-lock\.yaml$
+
+  # Python linting and formatting (for projects/python/)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.13.2
+    hooks:
+      - id: ruff-check  # Updated from legacy 'ruff' alias
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^projects/python/.*\.py$
+      - id: ruff-format
+        files: ^projects/python/.*\.py$
+
+
+  # JavaScript/TypeScript linting and formatting (for projects/nodejs/)
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.36.0
+    hooks:
+      - id: eslint
+        files: ^projects/nodejs/.*\.(js|ts|jsx|tsx)$
+        additional_dependencies:
+          - eslint@8.56.0
+          - "@typescript-eslint/parser@6.21.0"
+          - "@typescript-eslint/eslint-plugin@6.21.0"
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        files: ^projects/nodejs/.*\.(js|ts|jsx|tsx|json|md)$
+        exclude: ^projects/nodejs/.*\.lock$|^projects/nodejs/pnpm-lock\.yaml$
+
+  # Terraform formatting and validation (for infra/terraform/)
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.100.1
+    hooks:
+      - id: terraform_fmt
+        files: ^infra/terraform/.*\.tf$
+        stages: [manual]
+      - id: terraform_validate
+        files: ^infra/terraform/.*\.tf$
+        stages: [manual]
+      # terraform_tflint requires tflint installation, disabled for now
+      # - id: terraform_tflint
+      #   files: ^infra/terraform/.*\.tf$
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.37.1
+    hooks:
+      - id: yamllint
+        args: [-d, relaxed]
+        files: \.(yaml|yml)$
+        exclude: ^projects/nodejs/pnpm-lock\.yaml$|^ref-projects/
+
+  # Markdown linting (focused on structure, not line length)
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.45.0
+    hooks:
+      - id: markdownlint
+        args: ['--fix', '--disable', 'MD013']  # Disable line length rule
+        exclude: ^ref-projects/
+
+  # .NET formatting and analysis (for projects/dotnet/)
+  - repo: local
+    hooks:
+      - id: dotnet-format
+        name: dotnet format (whitespace + style)
+        entry: sh
+        args: ['-c', 'if command -v dotnet >/dev/null 2>&1; then cd projects/dotnet && if [ -f "WingedBean.sln" ]; then dotnet format WingedBean.sln --verbosity minimal || true; else echo "No solution found"; fi; else echo "dotnet CLI not found, skipping format"; fi']
+        language: system
+        files: ^projects/dotnet/.*\.(cs|vb|fs)$
+        pass_filenames: false
+        require_serial: true
+
+      - id: validate-issue-dependencies
+        name: Validate Issue Dependencies (R-ISS-030)
+        entry: python development/python/src/scripts/validate_issue_dependencies.py
+        language: system
+        stages: [commit-msg]
+        pass_filenames: true
+        always_run: false
+
+      - id: validate-doc-frontmatter
+        name: Validate RFC/ADR Frontmatter (R-DOC-020)
+        entry: python development/python/src/scripts/docs/validate_frontmatter.py
+        language: system
+        files: ^docs/(rfcs|adr)/.*\.md$
+        exclude: ^docs/(rfcs|adr)/README\.md$
+        pass_filenames: true
+
+      - id: validate-issue-metadata
+        name: Validate Issue Dependency Metadata (R-ISS-010)
+        entry: python development/python/src/hooks/pre_commit_issue_validator.py
+        language: system
+        files: ^(\.github/ISSUE_TEMPLATE/.*\.(yml|yaml|md)|docs/implementation/.*\.md)$
+        pass_filenames: true
+
+  # JetBrains CLI tools (comprehensive analysis - manual only)
+  - repo: local
+    hooks:
+      - id: jetbrains-cleanup
+        name: JetBrains Code Cleanup
+        entry: sh
+        exclude: ^infra/terraform/.*  # Terraform files are managed by terraform tooling
+        args: ['-c', 'if command -v jb >/dev/null 2>&1; then jb cleanupcode --profile="Built-in: Full Cleanup" projects/dotnet/ --verbosity=WARN || true; else echo "JetBrains CLI (jb) not found, skipping cleanup"; fi']
+        language: system
+        files: ^projects/dotnet/.*\.(cs|vb|fs)$
+        pass_filenames: false
+        require_serial: true
+        stages: [manual]  # Only run manually
+      - id: jetbrains-inspect
+        name: JetBrains Code Inspection
+        entry: sh
+        args: ['-c', 'if command -v jb >/dev/null 2>&1; then jb inspectcode projects/dotnet/ --build --format=json --output=.jetbrains-inspection-results.json --verbosity=WARN || true; else echo "JetBrains CLI (jb) not found, skipping inspection"; fi']
+        language: system
+        files: ^projects/dotnet/.*\.(cs|vb|fs|sln|csproj|vbproj|fsproj)$
+        pass_filenames: false
+        require_serial: true
+        stages: [manual]  # Only run manually
+
+  # Shell script linting - disabled due to installation issues
+  # Note: Install shellcheck manually if needed: brew install shellcheck
+
+  # Check for common security issues in various languages
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.6
+    hooks:
+      - id: bandit
+        files: ^projects/python/.*\.py$
+        args: ['-r', '-f', 'json']
+        exclude: ^projects/python/.*/tests/.*\.py$
+
+# Configuration for specific tools
+default_stages: [pre-commit]
+fail_fast: false
+minimum_pre_commit_version: 3.0.0
