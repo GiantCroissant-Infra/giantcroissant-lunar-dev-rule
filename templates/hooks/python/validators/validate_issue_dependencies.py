@@ -3,6 +3,7 @@
 Pre-commit hook: Validate issue dependencies
 Ensures commits don't reference blocked issues (per R-ISS-030)
 """
+
 import re
 import subprocess
 import sys
@@ -55,7 +56,9 @@ def extract_blockers(issue_body: str) -> List[int]:
 
 def check_issue_state(issue_num: int) -> Optional[str]:
     """Check if an issue is open or closed."""
-    output = run_gh_command(["issue", "view", str(issue_num), "--json", "state", "-q", ".state"])
+    output = run_gh_command(
+        ["issue", "view", str(issue_num), "--json", "state", "-q", ".state"]
+    )
     return output
 
 
@@ -79,7 +82,9 @@ def main() -> int:
     issue_num = extract_issue_number(commit_msg)
     if not issue_num:
         print("⚠️  Warning: No issue reference found in commit message")
-        print("   Consider adding 'Refs #<issue>' or 'Closes #<issue>' to link work to an issue")
+        print(
+            "   Consider adding 'Refs #<issue>' or 'Closes #<issue>' to link work to an issue"
+        )
         print()
         return 0  # Warning only
 
@@ -100,7 +105,9 @@ def main() -> int:
     print(f"Checking dependencies for issue #{issue_num}...")
 
     # Get issue body
-    issue_body = run_gh_command(["issue", "view", str(issue_num), "--json", "body", "-q", ".body"])
+    issue_body = run_gh_command(
+        ["issue", "view", str(issue_num), "--json", "body", "-q", ".body"]
+    )
     if not issue_body:
         print(f"⚠️  Could not fetch issue #{issue_num} (may not exist or no access)")
         return 0

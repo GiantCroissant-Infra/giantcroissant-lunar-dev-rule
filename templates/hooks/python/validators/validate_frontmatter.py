@@ -14,25 +14,27 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 try:
     import yaml
 except ImportError:
-    print("Error: PyYAML is required. Install with: pip install pyyaml", file=sys.stderr)
+    print(
+        "Error: PyYAML is required. Install with: pip install pyyaml", file=sys.stderr
+    )
     sys.exit(1)
 
 
 # RFC Validation Rules (R-DOC-020)
-RFC_REQUIRED_FIELDS = {'id', 'title', 'status', 'category', 'created', 'updated'}
-RFC_VALID_STATUSES = {'Draft', 'Proposed', 'Accepted', 'Implemented', 'Superseded'}
-RFC_ID_PATTERN = re.compile(r'^RFC-\d{4}$')
-DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+RFC_REQUIRED_FIELDS = {"id", "title", "status", "category", "created", "updated"}
+RFC_VALID_STATUSES = {"Draft", "Proposed", "Accepted", "Implemented", "Superseded"}
+RFC_ID_PATTERN = re.compile(r"^RFC-\d{4}$")
+DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # ADR Validation Rules (R-DOC-030)
-ADR_REQUIRED_FIELDS = {'id', 'title', 'status', 'date'}
-ADR_VALID_STATUSES = {'Accepted', 'Superseded'}
-ADR_ID_PATTERN = re.compile(r'^ADR-\d{4}$')
+ADR_REQUIRED_FIELDS = {"id", "title", "status", "date"}
+ADR_VALID_STATUSES = {"Accepted", "Superseded"}
+ADR_ID_PATTERN = re.compile(r"^ADR-\d{4}$")
 
 
 class FrontmatterError:
@@ -67,51 +69,56 @@ class FrontmatterValidator:
             or None if no frontmatter found
         """
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
 
             # Check for YAML frontmatter delimiters
-            if not lines or not lines[0].strip() == '---':
-                self.errors.append(FrontmatterError(
-                    file_path,
-                    "Missing frontmatter: file must start with '---' delimiter"
-                ))
+            if not lines or not lines[0].strip() == "---":
+                self.errors.append(
+                    FrontmatterError(
+                        file_path,
+                        "Missing frontmatter: file must start with '---' delimiter",
+                    )
+                )
                 return None
 
             # Find closing delimiter
             end_line = None
             for i, line in enumerate(lines[1:], start=1):
-                if line.strip() == '---':
+                if line.strip() == "---":
                     end_line = i
                     break
 
             if end_line is None:
-                self.errors.append(FrontmatterError(
-                    file_path,
-                    "Frontmatter opening '---' found but no closing '---'"
-                ))
+                self.errors.append(
+                    FrontmatterError(
+                        file_path,
+                        "Frontmatter opening '---' found but no closing '---'",
+                    )
+                )
                 return None
 
             # Parse YAML
-            frontmatter_text = ''.join(lines[1:end_line])
+            frontmatter_text = "".join(lines[1:end_line])
             try:
                 frontmatter = yaml.safe_load(frontmatter_text)
                 if frontmatter is None:
                     frontmatter = {}
                 return frontmatter, end_line
             except yaml.YAMLError as e:
-                self.errors.append(FrontmatterError(
-                    file_path,
-                    f"Invalid YAML: {e}",
-                    line=getattr(e, 'problem_mark', None).line if hasattr(e, 'problem_mark') else None
-                ))
+                self.errors.append(
+                    FrontmatterError(
+                        file_path,
+                        f"Invalid YAML: {e}",
+                        line=getattr(e, "problem_mark", None).line
+                        if hasattr(e, "problem_mark")
+                        else None,
+                    )
+                )
                 return None
 
         except Exception as e:
-            self.errors.append(FrontmatterError(
-                file_path,
-                f"Failed to read file: {e}"
-            ))
+            self.errors.append(FrontmatterError(file_path, f"Failed to read file: {e}"))
             return None
 
     def validate_rfc(self, file_path: Path, frontmatter: Dict) -> bool:
@@ -129,41 +136,49 @@ class FrontmatterValidator:
         # Check required fields
         missing_fields = RFC_REQUIRED_FIELDS - set(frontmatter.keys())
         if missing_fields:
-            self.errors.append(FrontmatterError(
-                file_path,
-                f"Missing required fields: {', '.join(sorted(missing_fields))}"
-            ))
+            self.errors.append(
+                FrontmatterError(
+                    file_path,
+                    f"Missing required fields: {', '.join(sorted(missing_fields))}",
+                )
+            )
             valid = False
 
         # Validate ID format
-        if 'id' in frontmatter:
-            rfc_id = str(frontmatter['id'])
+        if "id" in frontmatter:
+            rfc_id = str(frontmatter["id"])
             if not RFC_ID_PATTERN.match(rfc_id):
-                self.errors.append(FrontmatterError(
-                    file_path,
-                    f"Invalid ID format: '{rfc_id}' (expected: RFC-XXXX with 4 digits)"
-                ))
+                self.errors.append(
+                    FrontmatterError(
+                        file_path,
+                        f"Invalid ID format: '{rfc_id}' (expected: RFC-XXXX with 4 digits)",
+                    )
+                )
                 valid = False
 
         # Validate status
-        if 'status' in frontmatter:
-            status = str(frontmatter['status'])
+        if "status" in frontmatter:
+            status = str(frontmatter["status"])
             if status not in RFC_VALID_STATUSES:
-                self.errors.append(FrontmatterError(
-                    file_path,
-                    f"Invalid status: '{status}' (must be one of: {', '.join(sorted(RFC_VALID_STATUSES))})"
-                ))
+                self.errors.append(
+                    FrontmatterError(
+                        file_path,
+                        f"Invalid status: '{status}' (must be one of: {', '.join(sorted(RFC_VALID_STATUSES))})",
+                    )
+                )
                 valid = False
 
         # Validate date formats
-        for date_field in ['created', 'updated']:
+        for date_field in ["created", "updated"]:
             if date_field in frontmatter:
                 date_value = str(frontmatter[date_field])
                 if not DATE_PATTERN.match(date_value):
-                    self.errors.append(FrontmatterError(
-                        file_path,
-                        f"Invalid {date_field} date format: '{date_value}' (expected: YYYY-MM-DD)"
-                    ))
+                    self.errors.append(
+                        FrontmatterError(
+                            file_path,
+                            f"Invalid {date_field} date format: '{date_value}' (expected: YYYY-MM-DD)",
+                        )
+                    )
                     valid = False
 
         return valid
@@ -183,40 +198,48 @@ class FrontmatterValidator:
         # Check required fields
         missing_fields = ADR_REQUIRED_FIELDS - set(frontmatter.keys())
         if missing_fields:
-            self.errors.append(FrontmatterError(
-                file_path,
-                f"Missing required fields: {', '.join(sorted(missing_fields))}"
-            ))
+            self.errors.append(
+                FrontmatterError(
+                    file_path,
+                    f"Missing required fields: {', '.join(sorted(missing_fields))}",
+                )
+            )
             valid = False
 
         # Validate ID format
-        if 'id' in frontmatter:
-            adr_id = str(frontmatter['id'])
+        if "id" in frontmatter:
+            adr_id = str(frontmatter["id"])
             if not ADR_ID_PATTERN.match(adr_id):
-                self.errors.append(FrontmatterError(
-                    file_path,
-                    f"Invalid ID format: '{adr_id}' (expected: ADR-XXXX with 4 digits)"
-                ))
+                self.errors.append(
+                    FrontmatterError(
+                        file_path,
+                        f"Invalid ID format: '{adr_id}' (expected: ADR-XXXX with 4 digits)",
+                    )
+                )
                 valid = False
 
         # Validate status
-        if 'status' in frontmatter:
-            status = str(frontmatter['status'])
+        if "status" in frontmatter:
+            status = str(frontmatter["status"])
             if status not in ADR_VALID_STATUSES:
-                self.errors.append(FrontmatterError(
-                    file_path,
-                    f"Invalid status: '{status}' (must be one of: {', '.join(sorted(ADR_VALID_STATUSES))})"
-                ))
+                self.errors.append(
+                    FrontmatterError(
+                        file_path,
+                        f"Invalid status: '{status}' (must be one of: {', '.join(sorted(ADR_VALID_STATUSES))})",
+                    )
+                )
                 valid = False
 
         # Validate date format
-        if 'date' in frontmatter:
-            date_value = str(frontmatter['date'])
+        if "date" in frontmatter:
+            date_value = str(frontmatter["date"])
             if not DATE_PATTERN.match(date_value):
-                self.errors.append(FrontmatterError(
-                    file_path,
-                    f"Invalid date format: '{date_value}' (expected: YYYY-MM-DD)"
-                ))
+                self.errors.append(
+                    FrontmatterError(
+                        file_path,
+                        f"Invalid date format: '{date_value}' (expected: YYYY-MM-DD)",
+                    )
+                )
                 valid = False
 
         return valid
@@ -239,9 +262,9 @@ class FrontmatterValidator:
         frontmatter, _ = result
 
         # Determine file type and validate accordingly
-        if 'rfcs' in file_path.parts:
+        if "rfcs" in file_path.parts:
             return self.validate_rfc(file_path, frontmatter)
-        elif 'adr' in file_path.parts:
+        elif "adr" in file_path.parts:
             return self.validate_adr(file_path, frontmatter)
         else:
             # Unknown file type - skip validation
@@ -259,10 +282,7 @@ class FrontmatterValidator:
         all_valid = True
         for file_path in file_paths:
             if not file_path.exists():
-                self.errors.append(FrontmatterError(
-                    file_path,
-                    "File not found"
-                ))
+                self.errors.append(FrontmatterError(file_path, "File not found"))
                 all_valid = False
                 continue
 
@@ -307,26 +327,21 @@ Examples:
 
   # Validate files from pre-commit (receives filenames as arguments)
   %(prog)s docs/rfcs/0013-documentation-automation-tooling.md
-        """
+        """,
     )
 
     parser.add_argument(
-        'files',
-        nargs='*',
-        type=Path,
-        help='Markdown files to validate'
+        "files", nargs="*", type=Path, help="Markdown files to validate"
     )
 
     parser.add_argument(
-        '--check-all',
-        action='store_true',
-        help='Check all RFCs and ADRs in docs/ directory'
+        "--check-all",
+        action="store_true",
+        help="Check all RFCs and ADRs in docs/ directory",
     )
 
     parser.add_argument(
-        '--quiet',
-        action='store_true',
-        help='Suppress output, only use exit code'
+        "--quiet", action="store_true", help="Suppress output, only use exit code"
     )
 
     args = parser.parse_args()
@@ -337,11 +352,11 @@ Examples:
     if args.check_all:
         # Find all RFCs and ADRs
         repo_root = Path(__file__).resolve().parents[5]  # Navigate to repo root
-        docs_dir = repo_root / 'docs'
+        docs_dir = repo_root / "docs"
 
         if docs_dir.exists():
-            files_to_check.extend(docs_dir.glob('rfcs/*.md'))
-            files_to_check.extend(docs_dir.glob('adr/*.md'))
+            files_to_check.extend(docs_dir.glob("rfcs/*.md"))
+            files_to_check.extend(docs_dir.glob("adr/*.md"))
         else:
             print(f"Error: docs directory not found at {docs_dir}", file=sys.stderr)
             sys.exit(1)
@@ -352,7 +367,7 @@ Examples:
         sys.exit(1)
 
     # Filter out README files
-    files_to_check = [f for f in files_to_check if f.name.upper() != 'README.MD']
+    files_to_check = [f for f in files_to_check if f.name.upper() != "README.MD"]
 
     if not files_to_check:
         if not args.quiet:
@@ -371,5 +386,5 @@ Examples:
     sys.exit(0 if all_valid else 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

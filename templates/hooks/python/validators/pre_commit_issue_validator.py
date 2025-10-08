@@ -15,14 +15,21 @@ import re
 import sys
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Set, Optional, Tuple
+from typing import Dict, List, Optional
 import yaml
 
 
 class IssueMetadataValidator:
     """Validates issue metadata schema and dependencies."""
 
-    REQUIRED_FIELDS = ["rfc", "depends_on", "priority", "agent_assignable", "retry_count", "max_retries"]
+    REQUIRED_FIELDS = [
+        "rfc",
+        "depends_on",
+        "priority",
+        "agent_assignable",
+        "retry_count",
+        "max_retries",
+    ]
     VALID_PRIORITIES = ["critical", "high", "medium", "low"]
 
     def __init__(self, strict_mode: bool = True):
@@ -88,13 +95,23 @@ class IssueMetadataValidator:
 
         # Validate retry_count and max_retries
         if "retry_count" in metadata:
-            if not isinstance(metadata["retry_count"], int) or metadata["retry_count"] < 0:
-                self.errors.append(f"{file_path}: Field 'retry_count' must be a non-negative integer")
+            if (
+                not isinstance(metadata["retry_count"], int)
+                or metadata["retry_count"] < 0
+            ):
+                self.errors.append(
+                    f"{file_path}: Field 'retry_count' must be a non-negative integer"
+                )
                 is_valid = False
 
         if "max_retries" in metadata:
-            if not isinstance(metadata["max_retries"], int) or metadata["max_retries"] < 1:
-                self.errors.append(f"{file_path}: Field 'max_retries' must be a positive integer")
+            if (
+                not isinstance(metadata["max_retries"], int)
+                or metadata["max_retries"] < 1
+            ):
+                self.errors.append(
+                    f"{file_path}: Field 'max_retries' must be a positive integer"
+                )
                 is_valid = False
 
             # Per user preference: max_retries should default to 3
@@ -107,7 +124,9 @@ class IssueMetadataValidator:
         # Validate agent_assignable is boolean
         if "agent_assignable" in metadata:
             if not isinstance(metadata["agent_assignable"], bool):
-                self.errors.append(f"{file_path}: Field 'agent_assignable' must be a boolean")
+                self.errors.append(
+                    f"{file_path}: Field 'agent_assignable' must be a boolean"
+                )
                 is_valid = False
 
         # Validate RFC format
@@ -121,7 +140,9 @@ class IssueMetadataValidator:
 
         return is_valid
 
-    def detect_circular_dependencies(self, deps_graph: Dict[int, List[int]]) -> List[List[int]]:
+    def detect_circular_dependencies(
+        self, deps_graph: Dict[int, List[int]]
+    ) -> List[List[int]]:
         """
         Detect circular dependencies using DFS.
 
@@ -213,7 +234,9 @@ class IssueMetadataValidator:
             return True
 
         # Check if this looks like issue metadata (has our specific fields)
-        has_issue_fields = any(field in metadata for field in ["depends_on", "blocks", "agent_assignable"])
+        has_issue_fields = any(
+            field in metadata for field in ["depends_on", "blocks", "agent_assignable"]
+        )
 
         if not has_issue_fields:
             # Has frontmatter but not issue metadata (e.g., RFC frontmatter)
@@ -239,9 +262,7 @@ def get_staged_files() -> List[Path]:
         )
 
         files = [
-            Path(f.strip())
-            for f in result.stdout.strip().split("\n")
-            if f.strip()
+            Path(f.strip()) for f in result.stdout.strip().split("\n") if f.strip()
         ]
 
         return files
@@ -290,7 +311,9 @@ def main() -> int:
     files_to_validate = [f for f in staged_files if should_validate_file(f)]
 
     if not files_to_validate:
-        print(f"Scanned {len(staged_files)} staged files, none require issue metadata validation.")
+        print(
+            f"Scanned {len(staged_files)} staged files, none require issue metadata validation."
+        )
         return 0
 
     print(f"Validating {len(files_to_validate)} file(s) for issue metadata...\n")
@@ -353,7 +376,7 @@ max_retries: 3              # Required (default 3)
             print("\n⚠️  Validation failed, but proceeding (strict_mode=False)")
             return 0
 
-    print(f"\n✓ All issue metadata is valid")
+    print("\n✓ All issue metadata is valid")
     return 0
 
 
